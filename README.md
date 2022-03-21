@@ -51,3 +51,13 @@ module.exports = {
   </body>
 </html>
 ```
+
+```javascript
+// package.json
+// In order to run the scenario, "npm run test:integration"
+{
+  "scripts": {
+    "test:integration": "webrun integration-tests"
+  }
+}
+```
