@@ -1,11 +1,6 @@
 import chalk from "chalk";
 import { Browser } from "./browser";
 
-type ImportedTest = {
-  name: string;
-  run: (browser: Browser) => Promise<void>;
-};
-
 export enum TestStatus {
   IDLE,
   RUNNING,
@@ -13,17 +8,15 @@ export enum TestStatus {
   FAILED,
 }
 
-type TestLogger = {
-  changeStatus: (status: TestStatus) => void;
+type ImportedTest = {
+  name: string;
+  run: (browser: Browser) => Promise<void>;
 };
 
-function createLogger({
-  name,
-  shortFilePath,
-}: {
-  name: string;
-  shortFilePath: string;
-}): TestLogger {
+/**
+ * Creates a logger for a test in order to keep track of the status.
+ */
+function createLogger(test: Test) {
   const draft = console.draft();
 
   const changeStatus = (status: TestStatus) => {
@@ -45,7 +38,12 @@ function createLogger({
       badge = chalk.bgRed.whiteBright.bold(badge);
     }
 
-    draft(badge, name, chalk.dim(shortFilePath));
+    draft(
+      chalk.cyan(test.driverName),
+      badge,
+      test.name,
+      chalk.dim(test.shortFilePath)
+    );
   };
 
   return {
@@ -53,10 +51,12 @@ function createLogger({
   };
 }
 
-class Test {
+export class Test {
   name: string;
 
   shortFilePath: string;
+
+  driverName: string;
 
   status: TestStatus;
 
@@ -66,21 +66,28 @@ class Test {
 
   private logger;
 
-  constructor(shortFilePath: string, importedTest: ImportedTest) {
+  constructor(
+    importedTest: ImportedTest,
+    shortFilePath: string,
+    driverName: string
+  ) {
     this.name = importedTest.name;
     this.shortFilePath = shortFilePath;
+    this.driverName = driverName;
     this.callback = importedTest.run;
 
-    this.logger = createLogger({
-      name: this.name,
-      shortFilePath,
-    });
+    this.logger = createLogger(this);
 
     this.status = TestStatus.IDLE;
     this.setStatus(this.status);
   }
 
   async run(browser: Browser) {
+    // In case the test ran before...
+    if (this.status !== TestStatus.IDLE) {
+      throw new Error("Can only run tests that are in IDLE state.");
+    }
+
     this.setStatus(TestStatus.RUNNING);
 
     try {
@@ -98,7 +105,11 @@ class Test {
   }
 }
 
-export function createTest(filePath: string, shortFilePath: string) {
+export function createTest(
+  filePath: string,
+  shortFilePath: string,
+  driverName: string
+) {
   const importedTest = require(filePath) as ImportedTest;
-  return new Test(shortFilePath, importedTest);
+  return new Test(importedTest, shortFilePath, driverName);
 }

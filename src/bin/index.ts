@@ -16,6 +16,7 @@ const configName = "webrun.config.js";
 export type Config = {
   path: string;
   devServer: {
+    port: number;
     path: string;
   };
 };
@@ -28,6 +29,7 @@ function getConfig(basePath: string): Config {
   let config: Config = {
     path: "./",
     devServer: {
+      port: 3000,
       path: "./public",
     },
   };
@@ -40,7 +42,13 @@ function getConfig(basePath: string): Config {
   return config;
 }
 
-function createServer({ redirectTo }: { redirectTo: string }): Promise<Server> {
+function createServer({
+  redirectTo,
+  port,
+}: {
+  redirectTo: string;
+  port: number;
+}): Promise<Server> {
   const server = http.createServer((request, response) =>
     serveHandler(request, response, {
       redirects: [
@@ -56,7 +64,7 @@ function createServer({ redirectTo }: { redirectTo: string }): Promise<Server> {
   const terminator = createHttpTerminator({ server });
 
   return new Promise((resolve) => {
-    server.listen(3000, () => {
+    server.listen(port, () => {
       resolve({
         stop: () => terminator.terminate(),
       });
@@ -79,6 +87,10 @@ export async function entry(): Promise<void> {
   registerGlobals();
 
   const baseFolderName = process.argv[2];
+  const driverName = process.argv[3];
+  if (!driverName) {
+    return;
+  }
 
   const basePath = path.join(process.cwd(), baseFolderName);
   if (!fs.existsSync(basePath)) {
@@ -89,12 +101,14 @@ export async function entry(): Promise<void> {
   const config = getConfig(basePath);
 
   const server = await createServer({
+    port: config.devServer.port,
     redirectTo: path.join(baseFolderName, config.devServer.path),
   });
 
   await runTests({
     driverName: "chrome",
     path: path.join(basePath, config.path),
+    url: `http://localhost:${config.devServer.port}`,
   });
 
   await server.stop();
