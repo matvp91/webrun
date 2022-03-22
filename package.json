@@ -11,7 +11,9 @@
     "bin": "$npm_package_bin_webrun"
   },
   "dependencies": {
+    "chalk": "^4.1.2",
     "chromedriver": "^99.0.0",
+    "draftlog": "^1.0.13",
     "expect": "^27.5.1",
     "find-process": "^1.4.7",
     "glob": "^7.2.0",

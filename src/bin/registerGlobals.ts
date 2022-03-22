@@ -1,5 +1,8 @@
+import draftLog from "draftlog";
 import expect from "expect";
 import type { Expect, MatcherState } from "expect/build/types";
+
+draftLog.into(console);
 
 declare global {
   var expect: Expect<MatcherState>;

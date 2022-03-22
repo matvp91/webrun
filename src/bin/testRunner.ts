@@ -1,59 +1,10 @@
 import * as path from "path";
 import * as glob from "glob";
-import { createDriver, Driver } from "./createDriver";
-import { createClient, Client } from "./createClient";
-import { createBrowser, Browser } from "./browser";
-
-type TestDefinition = {
-  name: string;
-  run: (browser: Browser) => Promise<void>;
-};
-
-function createTest({
-  driver,
-  filePath,
-}: {
-  driver: Driver;
-  filePath: string;
-}): {
-  startSession: () => Promise<void>;
-  run: () => Promise<void>;
-  stopSession: () => Promise<void>;
-} {
-  let client: Client | null = null;
-  let definition: TestDefinition | null = null;
-  let browser: Browser | null = null;
-
-  const startSession = async () => {
-    definition = require(filePath);
-
-    client = await createClient(driver);
-    await client.navigateTo("http://localhost:3000");
-
-    browser = createBrowser(client);
-  };
-
-  const run = async () => {
-    if (!definition || !browser) {
-      return;
-    }
-    const { name, run } = definition;
-    console.log(`Starting test: ${name}`);
-    await run(browser);
-    console.log(`Finished test: ${name}`);
-  };
-
-  const stopSession = async () => {
-    await client?.deleteSession();
-    client = null;
-  };
-
-  return {
-    startSession,
-    run,
-    stopSession,
-  };
-}
+import chalk from "chalk";
+import { createDriver } from "./createDriver";
+import { createClient } from "./createClient";
+import { createTest, TestStatus } from "./createTest";
+import { createBrowser } from "./browser";
 
 export async function runTests({
   driverName,
@@ -69,22 +20,64 @@ export async function runTests({
   const testsPath = path.join(basePath, "**/*.test.js");
   const filePaths = glob.sync(testsPath);
 
-  for (let filePath of filePaths) {
-    const test = createTest({
-      driver,
-      filePath,
-    });
+  console.log("");
 
-    try {
-      await test.startSession();
+  const tests = filePaths.map((filePath) => {
+    const shortFilePath = filePath.replace(path.join(basePath, "../"), "");
+    return createTest(filePath, shortFilePath);
+  });
 
-      await test.run();
-    } catch (error) {
-      console.error("An error occured when running the test");
-    } finally {
-      await test.stopSession();
+  console.log("");
+
+  const failedTests = [];
+
+  for (let test of tests) {
+    const client = await createClient(driver);
+    await client.navigateTo("http://localhost:3000");
+
+    const browser = createBrowser(client);
+
+    await test.run(browser);
+
+    await client.deleteSession();
+
+    if (test.status === TestStatus.FAILED) {
+      failedTests.push(test);
     }
   }
 
   driver.stop();
+
+  if (failedTests.length) {
+    console.log(
+      chalk.redBright(`Looks like ${failedTests.length} test(s) failed.`)
+    );
+    console.log("");
+
+    failedTests.forEach((test) => {
+      let lineNumbers = "";
+      const stackFrame = test.error?.stack
+        ?.split("\n")
+        .find((line) => line.includes("Test.run"));
+      const arr = stackFrame?.match(/\(([^)]+)\)/)?.[1]?.split(":");
+      arr?.shift();
+      if (arr?.length === 2) {
+        lineNumbers = `:${arr.join(":")}`;
+      }
+
+      console.log(test.name, `${chalk.dim(test.shortFilePath)}${lineNumbers}`);
+
+      if (test.error) {
+        console.log("");
+
+        let lines = test.error.toString().split("\n");
+        for (let idx in lines) {
+          lines[idx] = `  ${lines[idx]}`;
+        }
+        console.log(lines.join("\n"));
+      }
+    });
+  }
+
+  console.log("");
 }

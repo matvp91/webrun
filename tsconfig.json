@@ -6,10 +6,13 @@
     "target": "es5",
     "moduleResolution": "node",
     "esModuleInterop": true,
-    "importHelpers": true
+    "importHelpers": true,
+    "paths": {
+      "draftlog": ["./src/types/draftlog.d.ts"]
+    }
   },
   "typedocOptions": {
-    "entryPoints": ["src/bin/index.ts"],
+    "entryPoints": ["./src/bin/index.ts"],
     "out": "docs"
   },
   "include": ["./src"],
