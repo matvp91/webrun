@@ -106,7 +106,7 @@ export async function entry(): Promise<void> {
   });
 
   await runTests({
-    driverName: "chrome",
+    driverName,
     path: path.join(basePath, config.path),
     url: `http://localhost:${config.devServer.port}`,
   });
