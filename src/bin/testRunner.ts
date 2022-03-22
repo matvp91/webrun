@@ -6,6 +6,33 @@ import { createClient } from "./createClient";
 import { createTest, TestStatus } from "./createTest";
 import { createBrowser } from "./browser";
 
+function findErrorLineNumbers(error?: Error) {
+  if (!error?.stack) {
+    return null;
+  }
+  let lineNumbers = null;
+
+  const stackFrame = error.stack
+    ?.split("\n")
+    .find((line) => line.includes("Test.run"));
+
+  const arr = stackFrame?.match(/\(([^)]+)\)/)?.[1]?.split(":");
+  arr?.shift();
+
+  if (arr?.length === 2) {
+    lineNumbers = `:${arr.join(":")}`;
+  }
+  return lineNumbers;
+}
+
+function indentMultiLines(lines: string) {
+  const arr = lines.split("\n");
+  for (let idx in arr) {
+    arr[idx] = `  ${arr[idx]}`;
+  }
+  return arr.join("\n");
+}
+
 export async function runTests({
   driverName,
   path: basePath,
@@ -55,29 +82,15 @@ export async function runTests({
     console.log("");
 
     failedTests.forEach((test) => {
-      let lineNumbers = "";
-      const stackFrame = test.error?.stack
-        ?.split("\n")
-        .find((line) => line.includes("Test.run"));
-      const arr = stackFrame?.match(/\(([^)]+)\)/)?.[1]?.split(":");
-      arr?.shift();
-      if (arr?.length === 2) {
-        lineNumbers = `:${arr.join(":")}`;
-      }
-
+      const lineNumbers = findErrorLineNumbers(test.error) ?? "";
       console.log(test.name, `${chalk.dim(test.shortFilePath)}${lineNumbers}`);
 
       if (test.error) {
         console.log("");
-
-        let lines = test.error.toString().split("\n");
-        for (let idx in lines) {
-          lines[idx] = `  ${lines[idx]}`;
-        }
-        console.log(lines.join("\n"));
+        console.log(indentMultiLines(test.error.toString()));
       }
+
+      console.log("");
     });
   }
-
-  console.log("");
 }
