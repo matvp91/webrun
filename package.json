@@ -1,6 +1,6 @@
 {
   "name": "@matvp91/webrun",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "main": "./dist/runtime.js",
   "bin": {
     "webrun": "bin/webrun.js"
