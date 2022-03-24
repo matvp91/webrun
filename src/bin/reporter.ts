@@ -17,13 +17,9 @@ export function bindReporterToRunners(runners: Runner[]) {
   const update = () => {
     let text = "";
 
-    let hasAtleastOneError = false;
-
     for (let runner of runners) {
       for (let test of runner.tests) {
         if (test.error) {
-          hasAtleastOneError = true;
-
           const parsedError = parseError(test.error);
           const lineNumbers = `:${parsedError.row}:${parsedError.line}`;
           text += `${chalk.red("FAIL")} ${chalk.bold(runner.browserName)} ${
@@ -31,12 +27,9 @@ export function bindReporterToRunners(runners: Runner[]) {
           } ${chalk.dim(test.shortPath)}${lineNumbers}\n`;
           text += "\n";
           text += `${multiLineIndention(test.error.toString())}\n`;
+          text += "\n";
         }
       }
-    }
-
-    if (hasAtleastOneError) {
-      text += "\n";
     }
 
     for (let runner of runners) {
@@ -53,6 +46,7 @@ export function bindReporterToRunners(runners: Runner[]) {
         }
         text += `  ${statusBadge} ${test.name} ${chalk.dim(test.shortPath)}\n`;
       }
+      text += "\n";
     }
 
     logUpdate(text);

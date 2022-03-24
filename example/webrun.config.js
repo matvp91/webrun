@@ -1,3 +1,3 @@
 module.exports = {
-  browserNames: ["chrome" /*, "safari"*/],
+  browserNames: ["chrome", "safari"],
 };
