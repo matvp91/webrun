@@ -1,33 +1,27 @@
-/**
- * This is where it all starts.
- * @module
- */
 import * as path from "path";
 import * as fs from "fs";
 import merge from "deepmerge";
-import * as http from "http";
-import { createHttpTerminator } from "http-terminator";
-import serveHandler from "serve-handler";
+import { Server } from "./Server";
+import { Runner } from "./Runner";
 import { registerGlobals } from "./registerGlobals";
-import { runTests } from "./testRunner";
-
-const configName = "webrun.config.js";
+import { collectTestSpecs } from "./helpers";
+import { bindReporterToRunners } from "./reporter";
 
 export type Config = {
   path: string;
+  browserNames: string[];
   devServer: {
     port: number;
     path: string;
   };
 };
 
-export type Server = {
-  stop: () => Promise<void>;
-};
+const configName = "webrun.config.js";
 
 function getConfig(basePath: string): Config {
   let config: Config = {
     path: "./",
+    browserNames: [],
     devServer: {
       port: 3000,
       path: "./public",
@@ -40,36 +34,6 @@ function getConfig(basePath: string): Config {
   }
 
   return config;
-}
-
-function createServer({
-  redirectTo,
-  port,
-}: {
-  redirectTo: string;
-  port: number;
-}): Promise<Server> {
-  const server = http.createServer((request, response) =>
-    serveHandler(request, response, {
-      redirects: [
-        {
-          type: 0,
-          source: "/",
-          destination: redirectTo,
-        },
-      ],
-    })
-  );
-
-  const terminator = createHttpTerminator({ server });
-
-  return new Promise((resolve) => {
-    server.listen(port, () => {
-      resolve({
-        stop: () => terminator.terminate(),
-      });
-    });
-  });
 }
 
 /**
@@ -87,10 +51,6 @@ export async function entry(): Promise<void> {
   registerGlobals();
 
   const baseFolderName = process.argv[2];
-  const driverName = process.argv[3];
-  if (!driverName) {
-    return;
-  }
 
   const basePath = path.join(process.cwd(), baseFolderName);
   if (!fs.existsSync(basePath)) {
@@ -100,16 +60,24 @@ export async function entry(): Promise<void> {
 
   const config = getConfig(basePath);
 
-  const server = await createServer({
-    port: config.devServer.port,
-    redirectTo: path.join(baseFolderName, config.devServer.path),
-  });
+  const server = new Server(
+    config.devServer.port,
+    path.join(baseFolderName, config.devServer.path)
+  );
 
-  await runTests({
-    driverName,
-    path: path.join(basePath, config.path),
-    url: `http://localhost:${config.devServer.port}`,
-  });
+  await server.start();
+
+  const testSpecs = collectTestSpecs(path.join(basePath, config.path));
+
+  const runners = config.browserNames.map(
+    (browserName) => new Runner(browserName, testSpecs)
+  );
+
+  bindReporterToRunners(runners);
+
+  for (let runner of runners) {
+    await runner.run();
+  }
 
   await server.stop();
 }

@@ -1,29 +1,43 @@
-export function findErrorLineNumbers(
-  error: Error,
-  name: string
-): string | null {
-  if (!error.stack) {
-    return null;
-  }
-  let lineNumbers = null;
+import * as glob from "glob";
+import * as path from "path";
+import { EventEmitter } from "events";
+import { TestSpec } from "./TestSpec";
 
-  const stackFrame = error.stack
-    ?.split("\n")
-    .find((line) => line.includes(name));
-
-  const arr = stackFrame?.match(/\(([^)]+)\)/)?.[1]?.split(":");
-  arr?.shift();
-
-  if (arr?.length === 2) {
-    lineNumbers = `:${arr.join(":")}`;
-  }
-  return lineNumbers;
+export function collectTestSpecs(basePath: string): TestSpec[] {
+  const files = glob.sync(path.join(basePath, "**/*.test.js"));
+  return files.map((filePath) => new TestSpec(filePath, basePath));
 }
 
-export function indentMultiLines(lines: string): string {
-  const arr = lines.split("\n");
-  for (let idx in arr) {
-    arr[idx] = `  ${arr[idx]}`;
-  }
-  return arr.join("\n");
+export function createBindListeners() {
+  let listeners: {
+    target: EventEmitter;
+    name: string;
+    callback: () => void;
+  }[] = [];
+
+  return {
+    add: (
+      target: EventEmitter,
+      names: string | string[],
+      callback: () => void
+    ) => {
+      if (!Array.isArray(names)) {
+        names = [names];
+      }
+      names.forEach((name) => {
+        target.on(name, callback);
+        listeners.push({
+          target,
+          name,
+          callback,
+        });
+      });
+    },
+    removeAll: () => {
+      listeners.forEach(({ target, name, callback }) => {
+        target.off(name, callback);
+      });
+      listeners = [];
+    },
+  };
 }
